@@ -1,7 +1,10 @@
 {
   "name": "bluemap",
   "version": "0.0.0",
-  "private": true,
+  "description": "Bluemap website for Mineplace",
+  "exports": {
+    ".": "./dist/bluemap.umd.js"
+  },
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
@@ -19,7 +22,6 @@
     "@vitejs/plugin-vue": "^5.2.1",
     "eslint": "~8.22.0",
     "eslint-plugin-vue": "^9.3.0",
-    "sass": "^1.57.0",
     "vite": "^6.3.4"
   }
 }

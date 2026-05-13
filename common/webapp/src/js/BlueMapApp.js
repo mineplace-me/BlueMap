@@ -341,7 +341,7 @@ export class BlueMapApp {
                 maxZoomDistance: 100000,
                 hiresSliderMax: 500,
                 hiresSliderDefault: 100,
-                hiresSliderMin: 0,
+                hiresSliderMin: 100,
                 lowresSliderMax: 7000,
                 lowresSliderDefault: 2000,
                 lowresSliderMin: 500,
@@ -737,11 +737,6 @@ export class BlueMapApp {
         }
 
         history.replaceState(undefined, undefined, hash);
-
-        document.title = i18n.t("pageTitle", {
-            map: this.mapViewer.map ? this.mapViewer.map.data.name : "?",
-            version: this.settings.version
-        });
     }
 
     loadPageAddress = async () => {
