@@ -1,10 +1,12 @@
 import com.matthewprenger.cursegradle.CurseProject
-import gradle.kotlin.dsl.accessors._30aa10cce2eda716151152e22de91a4c.curseforge
 import org.gradle.api.Action
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.closureOf
 
 fun Project.curseforgeBlueMap (configuration: Action<CurseProject>) {
+    val curseforge = extensions.getByName("curseforge")
+            as com.matthewprenger.cursegradle.CurseExtension
+
     curseforge.project(closureOf<CurseProject> {
         id = "406463"
         changelogType = "markdown"

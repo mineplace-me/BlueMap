@@ -187,6 +187,46 @@ public class ArrayTileModel implements TileModel {
     }
 
     @Override
+    public ArrayTileModel invertOrientation(int face) {
+        int index;
+        float x, y, z;
+
+        // swap first and last positions
+        index = face * FI_POSITION;
+
+        x = position[index    ];
+        y = position[index + 1];
+        z = position[index + 2];
+
+        position[index    ] = position[index + 6    ];
+        position[index + 1] = position[index + 6 + 1];
+        position[index + 2] = position[index + 6 + 2];
+
+        position[index + 6    ] = x;
+        position[index + 6 + 1] = y;
+        position[index + 6 + 2] = z;
+
+        // swap first and last uvs
+        index = face * FI_UV;
+        x = uv[index    ];
+        y = uv[index + 1];
+
+        uv[index    ] = uv[index + 4    ];
+        uv[index + 1] = uv[index + 4 + 1];
+
+        uv[index + 4    ] = x;
+        uv[index + 4 + 1] = y;
+
+        // swap first and last ao
+        index = face * FI_AO;
+        x = ao[index];
+        ao[index] = ao[index + 2];
+        ao[index + 2] = x;
+
+        return this;
+    }
+
+    @Override
     public ArrayTileModel rotate(
             int start, int count,
             float angle, float axisX, float axisY, float axisZ
@@ -212,40 +252,97 @@ public class ArrayTileModel implements TileModel {
         return rotateByQuaternion(start, count, qx, qy, qz, qw);
     }
 
-    @Override
-    public ArrayTileModel rotate(
+    public ArrayTileModel rotateXYZ(
             int start, int count,
             float pitch, float yaw, float roll
     ) {
-
         double
-                halfYaw = Math.toRadians(yaw) * 0.5,
-                qy1 = TrigMath.sin(halfYaw),
-                qw1 = TrigMath.cos(halfYaw),
-
                 halfPitch = Math.toRadians(pitch) * 0.5,
-                qx2 = TrigMath.sin(halfPitch),
-                qw2 = TrigMath.cos(halfPitch),
+                sx = TrigMath.sin(halfPitch),
+                cx = TrigMath.cos(halfPitch),
+
+                halfYaw = Math.toRadians(yaw) * 0.5,
+                sy = TrigMath.sin(halfYaw),
+                cy = TrigMath.cos(halfYaw),
 
                 halfRoll = Math.toRadians(roll) * 0.5,
-                qz3 = TrigMath.sin(halfRoll),
-                qw3 = TrigMath.cos(halfRoll);
+                sz = TrigMath.sin(halfRoll),
+                cz = TrigMath.cos(halfRoll),
 
-        // multiply 1 with 2
+                cycz = cy * cz,
+                sysz = sy * sz,
+                sycz = sy * cz,
+                cysz = cy * sz;
+
+        return rotateByQuaternion(
+                start, count,
+                sx * cycz + cx * sysz,
+                cx * sycz - sx * cysz,
+                cx * cysz + sx * sycz,
+                cx * cycz - sx * sysz
+        );
+    }
+
+    public ArrayTileModel rotateZYX(
+            int start, int count,
+            float pitch, float yaw, float roll
+    ) {
         double
-                qxA =   qw1 * qx2,
-                qyA =   qy1 * qw2,
-                qzA = - qy1 * qx2,
-                qwA =   qw1 * qw2;
+                halfPitch = Math.toRadians(pitch) * 0.5,
+                sx = TrigMath.sin(halfPitch),
+                cx = TrigMath.cos(halfPitch),
 
-        // multiply with 3
+                halfYaw = Math.toRadians(yaw) * 0.5,
+                sy = TrigMath.sin(halfYaw),
+                cy = TrigMath.cos(halfYaw),
+
+                halfRoll = Math.toRadians(roll) * 0.5,
+                sz = TrigMath.sin(halfRoll),
+                cz = TrigMath.cos(halfRoll),
+
+                cycz = cy * cz,
+                sysz = sy * sz,
+                sycz = sy * cz,
+                cysz = cy * sz;
+
+        return rotateByQuaternion(
+                start, count,
+                cx * cycz + sx * sysz,
+                sx * cycz - cx * sysz,
+                cx * sycz + sx * cysz,
+                cx * cysz - sx * sycz
+        );
+    }
+
+    public ArrayTileModel rotateYXZ(
+            int start, int count,
+            float pitch, float yaw, float roll
+    ) {
         double
-                qx = qxA * qw3 + qyA * qz3,
-                qy = qyA * qw3 - qxA * qz3,
-                qz = qwA * qz3 + qzA * qw3,
-                qw = qwA * qw3 - qzA * qz3;
+                halfPitch = Math.toRadians(pitch) * 0.5,
+                sx = TrigMath.sin(halfPitch),
+                cx = TrigMath.cos(halfPitch),
 
-        return rotateByQuaternion(start, count, qx, qy, qz, qw);
+                halfYaw = Math.toRadians(yaw) * 0.5,
+                sy = TrigMath.sin(halfYaw),
+                cy = TrigMath.cos(halfYaw),
+
+                halfRoll = Math.toRadians(roll) * 0.5,
+                sz = TrigMath.sin(halfRoll),
+                cz = TrigMath.cos(halfRoll),
+
+                cysx = cy * sx,
+                sycx = sy * cx,
+                sysx = sy * sx,
+                cycx = cy * cx;
+
+        return rotateByQuaternion(
+                start, count,
+                cysx * cz + sycx * sz,
+                sycx * cz - cysx * sz,
+                cycx * sz - sysx * cz,
+                cycx * cz + sysx * sz
+        );
     }
 
     @Override

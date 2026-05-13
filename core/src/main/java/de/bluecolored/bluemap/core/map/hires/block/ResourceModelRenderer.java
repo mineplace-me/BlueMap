@@ -49,6 +49,7 @@ import de.bluecolored.bluemap.core.world.BlockProperties;
 import de.bluecolored.bluemap.core.world.LightData;
 import de.bluecolored.bluemap.core.world.block.BlockNeighborhood;
 import de.bluecolored.bluemap.core.world.block.ExtendedBlock;
+import lombok.Getter;
 
 import java.util.function.Function;
 
@@ -59,11 +60,11 @@ import java.util.function.Function;
 public class ResourceModelRenderer implements BlockRenderer {
     private static final float BLOCK_SCALE = 1f / 16f;
 
-    private final Function<ResourcePath<Model>, Model> modelProvider;
-    private final Function<ResourcePath<Texture>, Texture> textureProvider;
-    private final TextureGallery textureGallery;
-    private final RenderSettings renderSettings;
-    private final BlockColorCalculatorFactory.BlockColorCalculator blockColorCalculator;
+    @Getter private final Function<ResourcePath<Model>, Model> modelProvider;
+    @Getter private final Function<ResourcePath<Texture>, Texture> textureProvider;
+    @Getter private final TextureGallery textureGallery;
+    @Getter private final RenderSettings renderSettings;
+    @Getter private final BlockColorCalculatorFactory.BlockColorCalculator blockColorCalculator;
 
     private final VectorM3f[] corners = new VectorM3f[8];
     private final VectorM2f[] rawUvs = new VectorM2f[4];
@@ -89,6 +90,7 @@ public class ResourceModelRenderer implements BlockRenderer {
         for (int i = 0; i < rawUvs.length; i++) rawUvs[i] = new VectorM2f(0, 0);
     }
 
+    @Override
     public void render(BlockNeighborhood block, Variant variant, TileModelView blockModel, Color color) {
         this.block = block;
         this.blockModel = blockModel;
@@ -103,6 +105,8 @@ public class ResourceModelRenderer implements BlockRenderer {
 
         // render model
         int modelStart = blockModel.getStart();
+
+
 
         Element[] elements = modelResource.getElements();
         if (elements != null) {
@@ -139,12 +143,12 @@ public class ResourceModelRenderer implements BlockRenderer {
         Vector3f to = element.getTo();
 
         float
-                minX = Math.min(from.getX(), to.getX()),
-                minY = Math.min(from.getY(), to.getY()),
-                minZ = Math.min(from.getZ(), to.getZ()),
-                maxX = Math.max(from.getX(), to.getX()),
-                maxY = Math.max(from.getY(), to.getY()),
-                maxZ = Math.max(from.getZ(), to.getZ());
+                minX = from.getX(),
+                minY = from.getY(),
+                minZ = from.getZ(),
+                maxX = to.getX(),
+                maxY = to.getY(),
+                maxZ = to.getZ();
 
         VectorM3f[] c = corners;
         c[0].x = minX; c[0].y = minY; c[0].z = minZ;
@@ -194,11 +198,7 @@ public class ResourceModelRenderer implements BlockRenderer {
         ) return;
 
         // calculate faceRotationVector
-        faceRotationVector.set(
-                faceDirVector.getX(),
-                faceDirVector.getY(),
-                faceDirVector.getZ()
-        );
+        faceRotationVector.set(faceDirVector);
         faceRotationVector.rotateAndScale(element.getRotation().getMatrix());
         makeRotationRelative(faceRotationVector);
 
@@ -257,19 +257,8 @@ public class ResourceModelRenderer implements BlockRenderer {
             uvs[i] = rawUvs[(rotationSteps + i) % 4];
 
         // UV-Lock counter-rotation
-        float uvRotation = 0f;
         if (variant.isUvlock() && variant.isTransformed()) {
-            float xRotSin = TrigMath.sin(variant.getX() * TrigMath.DEG_TO_RAD);
-            float xRotCos = TrigMath.cos(variant.getX() * TrigMath.DEG_TO_RAD);
-
-            uvRotation =
-                    variant.getY() * (faceDirVector.getY() * xRotCos + faceDirVector.getZ() * xRotSin) +
-                    variant.getX() * (1 - faceDirVector.getY());
-        }
-
-        // rotate uv's
-        if (uvRotation != 0){
-            uvRotation = (float)(uvRotation * TrigMath.DEG_TO_RAD);
+            float uvRotation = uvLockRotation(faceDir);
             float cx = TrigMath.cos(uvRotation), cy = TrigMath.sin(uvRotation);
             for (VectorM2f uv : uvs) {
                 uv.translate(-0.5f, -0.5f);
@@ -348,6 +337,42 @@ public class ResourceModelRenderer implements BlockRenderer {
                 blockColor.add(mapColor);
             }
         }
+    }
+
+    private final VectorM3f rotatedNormal = new VectorM3f(0, 0, 0);
+    private final VectorM3f rotatedUp = new VectorM3f(0, 0, 0);
+    private final VectorM3f projectedWorldUp = new VectorM3f(0, 0, 0);
+    private float uvLockRotation(Direction direction) {
+        if (!variant.isTransformed()) return 0f;
+
+        makeRotationRelative(rotatedNormal.set(direction.toVector()));
+        makeRotationRelative(rotatedUp.set(direction.getLocalUp().toVector()));
+
+        // project world-up (0, 1, 0) onto rotated face
+        projectedWorldUp.set(0f, 1f, 0f);
+        float dot = projectedWorldUp.dot(rotatedNormal);
+        projectedWorldUp.set(rotatedNormal);
+        projectedWorldUp.mul(dot);
+        projectedWorldUp.set(
+                0f - projectedWorldUp.x,
+                1f - projectedWorldUp.y,
+                0f - projectedWorldUp.z
+        );
+
+        // special case, if we are close to up or down, the rotation should be locked to NORTH/SOUTH (localUp)
+        if (projectedWorldUp.lengthSquared() < 0.01) {
+            Direction upDown = rotatedNormal.y > 0f ? Direction.UP : Direction.DOWN;
+            projectedWorldUp.set(upDown.getLocalUp().toVector());
+        } else {
+            projectedWorldUp.normalize();
+        }
+
+        // compute angle between rotatedUp and projectedWorldUp around rotatedNormal
+        dot = rotatedUp.dot(projectedWorldUp);
+        return (float) TrigMath.atan2(
+                rotatedUp.cross(projectedWorldUp).dot(rotatedNormal),
+                dot
+        );
     }
 
     private ExtendedBlock getRotationRelativeBlock(Direction direction){

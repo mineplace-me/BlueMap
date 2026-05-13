@@ -24,16 +24,15 @@
  */
 package de.bluecolored.bluemap.bukkit;
 
-import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import de.bluecolored.bluemap.common.plugin.Plugin;
 import de.bluecolored.bluemap.common.serverinterface.Player;
 import de.bluecolored.bluemap.common.serverinterface.Server;
 import de.bluecolored.bluemap.common.serverinterface.ServerEventListener;
 import de.bluecolored.bluemap.common.serverinterface.ServerWorld;
-import de.bluecolored.bluemap.core.BlueMap;
 import de.bluecolored.bluemap.core.logger.JavaLogger;
 import de.bluecolored.bluemap.core.logger.Logger;
+import de.bluecolored.bluemap.core.util.Caches;
 import de.bluecolored.bluemap.core.util.Key;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
@@ -98,8 +97,7 @@ public class BukkitPlugin extends JavaPlugin implements Server, Listener {
         this.pluginInstance = new Plugin("spigot", this);
         this.commands = new BukkitCommands(this.pluginInstance);
 
-        this.worlds = Caffeine.newBuilder()
-                .executor(BlueMap.THREAD_POOL)
+        this.worlds = Caches.with()
                 .weakKeys()
                 .maximumSize(1000)
                 .build(BukkitWorld::new);
@@ -269,18 +267,20 @@ public class BukkitPlugin extends JavaPlugin implements Server, Listener {
      * Only call this method on the server-thread.
      */
     private void updateSomePlayers() {
-        int onlinePlayerCount = onlinePlayerList.size();
-        if (onlinePlayerCount == 0) return;
+        synchronized (onlinePlayerList) {
+            int onlinePlayerCount = onlinePlayerList.size();
+            if (onlinePlayerCount == 0) return;
 
-        int playersToBeUpdated = onlinePlayerCount / 20; //with 20 tps, each player is updated once a second
-        if (playersToBeUpdated == 0) playersToBeUpdated = 1;
+            int playersToBeUpdated = onlinePlayerCount / 20; //with 20 tps, each player is updated once a second
+            if (playersToBeUpdated == 0) playersToBeUpdated = 1;
 
-        for (int i = 0; i < playersToBeUpdated; i++) {
-            playerUpdateIndex++;
-            if (playerUpdateIndex >= 20 && playerUpdateIndex >= onlinePlayerCount) playerUpdateIndex = 0;
+            for (int i = 0; i < playersToBeUpdated; i++) {
+                playerUpdateIndex++;
+                if (playerUpdateIndex >= 20 && playerUpdateIndex >= onlinePlayerCount) playerUpdateIndex = 0;
 
-            if (playerUpdateIndex < onlinePlayerCount) {
-                onlinePlayerList.get(playerUpdateIndex).update();
+                if (playerUpdateIndex < onlinePlayerCount) {
+                    onlinePlayerList.get(playerUpdateIndex).update();
+                }
             }
         }
     }

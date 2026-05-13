@@ -35,6 +35,7 @@ import de.bluecolored.bluemap.api.markers.MarkerSet;
 import de.bluecolored.bluemap.core.map.MapSettings;
 import de.bluecolored.bluemap.core.map.mask.CombinedMask;
 import de.bluecolored.bluemap.core.util.Key;
+import de.bluecolored.bluemap.core.world.WorldLoaderType;
 import lombok.AccessLevel;
 import lombok.Getter;
 import org.jetbrains.annotations.Nullable;
@@ -53,6 +54,7 @@ import java.util.Map;
 @Getter
 public class MapConfig implements MapSettings {
 
+    private WorldLoaderType loader = WorldLoaderType.ANVIL;
     @Nullable private Path world = null;
     @Nullable private Key dimension = null;
 
@@ -60,7 +62,7 @@ public class MapConfig implements MapSettings {
 
     private int sorting = 0;
 
-    @Nullable private Vector2i startPos = null;
+    private Vector2i startPos = Vector2i.ZERO;
 
     private String skyColor = "#7dabff";
     private String voidColor = "#000000";

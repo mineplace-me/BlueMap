@@ -24,7 +24,6 @@
  */
 package de.bluecolored.bluemap.forge;
 
-import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import de.bluecolored.bluecommands.brigadier.BrigadierBridge;
 import de.bluecolored.bluemap.common.commands.BrigadierExecutionHandler;
@@ -34,13 +33,13 @@ import de.bluecolored.bluemap.common.serverinterface.Player;
 import de.bluecolored.bluemap.common.serverinterface.Server;
 import de.bluecolored.bluemap.common.serverinterface.ServerEventListener;
 import de.bluecolored.bluemap.common.serverinterface.ServerWorld;
-import de.bluecolored.bluemap.core.BlueMap;
 import de.bluecolored.bluemap.core.logger.Logger;
+import de.bluecolored.bluemap.core.util.Caches;
 import net.minecraft.SharedConstants;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -87,8 +86,7 @@ public class ForgeMod implements Server {
         this.pluginInstance = new Plugin("forge", this);
 
         this.eventForwarder = new ForgeEventForwarder();
-        this.worlds = Caffeine.newBuilder()
-                .executor(BlueMap.THREAD_POOL)
+        this.worlds = Caches.with()
                 .weakKeys()
                 .maximumSize(1000)
                 .build(ForgeWorld::new);
@@ -146,8 +144,12 @@ public class ForgeMod implements Server {
     }
 
     @SubscribeEvent
-    public void onTick(ServerTickEvent evt) {
-        updateSomePlayers();
+    public void onTick(ServerTickEvent.Post evt) {
+        try {
+            updateSomePlayers();
+        } catch (RuntimeException e) {
+            Logger.global.logError("Exception trying to update players", e);
+        }
     }
 
     @Override
@@ -179,8 +181,8 @@ public class ForgeMod implements Server {
     public Optional<ServerWorld> getServerWorld(Object world) {
 
         if (world instanceof String) {
-            ResourceLocation resourceLocation = ResourceLocation.tryParse((String) world);
-            if (resourceLocation != null) world = serverInstance.getLevel(ResourceKey.create(Registries.DIMENSION, resourceLocation));
+            Identifier identifier = Identifier.tryParse((String) world);
+            if (identifier != null) world = serverInstance.getLevel(ResourceKey.create(Registries.DIMENSION, identifier));
         }
 
         if (world instanceof ResourceKey) {
@@ -248,18 +250,20 @@ public class ForgeMod implements Server {
      * Only call this method on the server-thread.
      */
     private void updateSomePlayers() {
-        int onlinePlayerCount = onlinePlayerList.size();
-        if (onlinePlayerCount == 0) return;
+        synchronized (onlinePlayerList) {
+            int onlinePlayerCount = onlinePlayerList.size();
+            if (onlinePlayerCount == 0) return;
 
-        int playersToBeUpdated = onlinePlayerCount / 20; //with 20 tps, each player is updated once a second
-        if (playersToBeUpdated == 0) playersToBeUpdated = 1;
+            int playersToBeUpdated = onlinePlayerCount / 20; //with 20 tps, each player is updated once a second
+            if (playersToBeUpdated == 0) playersToBeUpdated = 1;
 
-        for (int i = 0; i < playersToBeUpdated; i++) {
-            playerUpdateIndex++;
-            if (playerUpdateIndex >= 20 && playerUpdateIndex >= onlinePlayerCount) playerUpdateIndex = 0;
+            for (int i = 0; i < playersToBeUpdated; i++) {
+                playerUpdateIndex++;
+                if (playerUpdateIndex >= 20 && playerUpdateIndex >= onlinePlayerCount) playerUpdateIndex = 0;
 
-            if (playerUpdateIndex < onlinePlayerCount) {
-                onlinePlayerList.get(playerUpdateIndex).update();
+                if (playerUpdateIndex < onlinePlayerCount) {
+                    onlinePlayerList.get(playerUpdateIndex).update();
+                }
             }
         }
     }

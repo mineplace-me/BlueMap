@@ -231,11 +231,14 @@ public class Plugin implements ServerEventListener {
                     webLogger = Logger.combine(webLoggerList);
 
                     try {
-                        webServer = new HttpServer(new LoggingRequestHandler(
-                                webRequestHandler,
-                                webserverConfig.getLog().getFormat(),
-                                webLogger
-                        ));
+                        webServer = new HttpServer(
+                                "BlueMap-Webserver",
+                                new LoggingRequestHandler(
+                                        webRequestHandler,
+                                        webserverConfig.getLog().getFormat(),
+                                        webLogger
+                                )
+                        );
                         webServer.bind(new InetSocketAddress(
                                 webserverConfig.resolveIp(),
                                 webserverConfig.getPort()
@@ -328,8 +331,8 @@ public class Plugin implements ServerEventListener {
                 daemonTimer.schedule(fileWatcherRestartTask, TimeUnit.HOURS.toMillis(1), TimeUnit.HOURS.toMillis(1));
 
                 //periodically update all (non frozen) maps
-                if (pluginConfig.getFullUpdateInterval() > 0) {
-                    long fullUpdateTime = TimeUnit.MINUTES.toMillis(pluginConfig.getFullUpdateInterval());
+                long fullUpdateInterval = coreConfig.getFullUpdateInterval().toMillis();
+                if (fullUpdateInterval > 0) {
                     TimerTask updateAllMapsTask = new TimerTask() {
                         @Override
                         public void run() {
@@ -340,7 +343,7 @@ public class Plugin implements ServerEventListener {
                                     .toArray(RenderTask[]::new));
                         }
                     };
-                    daemonTimer.scheduleAtFixedRate(updateAllMapsTask, 0, fullUpdateTime);
+                    daemonTimer.scheduleAtFixedRate(updateAllMapsTask, 0, fullUpdateInterval);
                 }
 
                 //metrics
@@ -418,7 +421,7 @@ public class Plugin implements ServerEventListener {
                 if (renderManager != null){
                     if (renderManager.getCurrentRenderTask() != null) {
                         renderManager.removeAllRenderTasks();
-                        if (!renderManager.isRunning()) renderManager.start(1);
+                        if (!renderManager.isRunning()) renderManager.start(1, Thread.NORM_PRIORITY);
                         try {
                             renderManager.awaitIdle(true);
                         } catch (InterruptedException ex) {
@@ -565,8 +568,10 @@ public class Plugin implements ServerEventListener {
     public synchronized void startWatchingMap(BmMap map) {
         stopWatchingMap(map);
 
+        if (blueMap == null) return;
+
         try {
-            MapUpdateService watcher = new MapUpdateService(renderManager, map);
+            MapUpdateService watcher = new MapUpdateService(renderManager, map, blueMap.getConfig().getCoreConfig().getUpdateCooldown(), false);
             watcher.start();
             mapUpdateServices.put(map.getId(), watcher);
         } catch (IOException ex) {
@@ -627,7 +632,7 @@ public class Plugin implements ServerEventListener {
             return true;
         } else {
             if (!renderManager.isRunning() && getPluginState().isRenderThreadsEnabled())
-                renderManager.start(coreConfig.resolveRenderThreadCount());
+                renderManager.start(coreConfig.resolveRenderThreadCount(), coreConfig.getRenderThreadPriority());
             return false;
         }
     }

@@ -63,12 +63,24 @@ public interface TileModel {
 
     TileModel setMaterialIndex(int face, int m);
 
+    TileModel invertOrientation(int face);
+
     TileModel rotate(
             int start, int count,
             float angle, float axisX, float axisY, float axisZ
     );
 
-    TileModel rotate(
+    TileModel rotateXYZ(
+            int start, int count,
+            float pitch, float yaw, float roll
+    );
+
+    TileModel rotateZYX(
+            int start, int count,
+            float pitch, float yaw, float roll
+    );
+
+    TileModel rotateYXZ(
             int start, int count,
             float pitch, float yaw, float roll
     );
@@ -106,6 +118,14 @@ public interface TileModel {
             float m20, float m21, float m22, float m23,
             float m30, float m31, float m32, float m33
     );
+
+    default TileModel invertOrientation(int start, int count) {
+        int end = start + count;
+        for (int face = start; face < end; face++) {
+            invertOrientation(face);
+        }
+        return this;
+    }
 
     TileModel reset(int size);
 

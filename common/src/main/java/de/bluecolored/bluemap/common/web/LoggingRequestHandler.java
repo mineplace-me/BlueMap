@@ -55,7 +55,7 @@ public class LoggingRequestHandler implements HttpRequestHandler {
     public HttpResponse handle(HttpRequest request) {
 
         // gather format parameters from request
-        String source = request.getSource().toString();
+        String source = request.getSource().getHostAddress();
         String xffSource = source;
         HttpHeader xffHeader = request.getHeader("X-Forwarded-For");
         if (xffHeader != null && !xffHeader.getValues().isEmpty()) {
@@ -63,7 +63,9 @@ public class LoggingRequestHandler implements HttpRequestHandler {
         }
 
         String method = request.getMethod();
-        String address = request.getAddress();
+        String path = request.getPath();
+        String queryString = request.getRawQueryString();
+        String address = queryString == null ? path : path + "?" + queryString;
         String version = request.getVersion();
 
         // run request

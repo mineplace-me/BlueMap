@@ -24,18 +24,17 @@
  */
 package de.bluecolored.bluemap.core.util;
 
-import java.util.concurrent.ConcurrentHashMap;
+import com.github.benmanes.caffeine.cache.Interner;
 
 public class StringUtil {
 
-    private static final ConcurrentHashMap<String, String> STRING_INTERN_POOL = new ConcurrentHashMap<>();
+    private static final Interner<String> STRING_INTERNER = Interner.newWeakInterner();
 
     /**
-     * Using our own function instead of {@link String#intern()} since the ConcurrentHashMap is much faster.
+     * Using Caffeines {@link Interner} instead of {@link String#intern()} since it is much faster.
      */
     public static String intern(String string) {
-        String interned = STRING_INTERN_POOL.putIfAbsent(string, string);
-        return interned != null ? interned : string;
+        return STRING_INTERNER.intern(string);
     }
 
 }

@@ -25,22 +25,30 @@
 package de.bluecolored.bluemap.common.plugin;
 
 import com.flowpowered.math.vector.Vector2i;
+import com.github.benmanes.caffeine.cache.Cache;
 import de.bluecolored.bluemap.common.rendermanager.RenderManager;
 import de.bluecolored.bluemap.common.rendermanager.WorldRegionRenderTask;
 import de.bluecolored.bluemap.core.logger.Logger;
 import de.bluecolored.bluemap.core.map.BmMap;
+import de.bluecolored.bluemap.core.util.Caches;
 import de.bluecolored.bluemap.core.util.WatchService;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 public class MapUpdateService extends Thread {
 
+    private static final AtomicInteger NEXT_ID = new AtomicInteger(0);
+
     private final BmMap map;
     private final RenderManager renderManager;
+    private final Duration regionUpdateCooldown;
     private final WatchService<Vector2i> watchService;
 
     private volatile boolean closed;
@@ -48,20 +56,29 @@ public class MapUpdateService extends Thread {
     private Timer delayTimer;
 
     private final Map<Vector2i, TimerTask> scheduledUpdates;
+    private final Cache<Vector2i, Long> lastUpdateTimes;
 
-    public MapUpdateService(RenderManager renderManager, BmMap map) throws IOException {
+    private final Consumer<String> verboseLog;
+
+    public MapUpdateService(RenderManager renderManager, BmMap map, Duration regionUpdateCooldown, boolean verbose) throws IOException {
+        super("BlueMap-MapUpdateService-" + NEXT_ID.getAndIncrement());
         this.renderManager = renderManager;
         this.map = map;
+        this.regionUpdateCooldown = regionUpdateCooldown;
         this.closed = false;
         this.scheduledUpdates = new HashMap<>();
+        this.lastUpdateTimes = Caches.with()
+                .expireAfterWrite(regionUpdateCooldown)
+                .build();
         this.watchService = map.getWorld().createRegionWatchService();
+        this.verboseLog = verbose ? Logger.global::logInfo : Logger.global::logDebug;
     }
 
     @Override
     public void run() {
         if (delayTimer == null) delayTimer = new Timer("BlueMap-RegionFileWatchService-DelayTimer", true);
 
-        Logger.global.logDebug("Started watching map '" + map.getId() + "' for updates...");
+        verboseLog.accept("Started watching map '" + map.getId() + "' for updates...");
 
         try {
             while (!closed)
@@ -72,7 +89,7 @@ public class MapUpdateService extends Thread {
         } catch (InterruptedException iex) {
             Thread.currentThread().interrupt();
         } finally {
-            Logger.global.logDebug("Stopped watching map '" + map.getId() + "' for updates.");
+            verboseLog.accept("Stopped watching map '" + map.getId() + "' for updates.");
             if (!closed) {
                 Logger.global.logWarning("Region-file watch-service for map '" + map.getId() +
                         "' stopped unexpectedly! (This map might not update automatically from now on)");
@@ -83,7 +100,7 @@ public class MapUpdateService extends Thread {
     private synchronized void updateRegion(Vector2i regionPos) {
         if (closed) return;
 
-        // we only want to start the render when there were no changes on a file for 5 seconds
+        // we only want to start the render when there were no changes on a file for at least 5 seconds
         TimerTask task = scheduledUpdates.remove(regionPos);
         if (task != null) task.cancel();
 
@@ -94,13 +111,19 @@ public class MapUpdateService extends Thread {
                     WorldRegionRenderTask task = new WorldRegionRenderTask(map, regionPos);
                     scheduledUpdates.remove(regionPos);
                     renderManager.scheduleRenderTask(task);
+                    lastUpdateTimes.put(regionPos, System.currentTimeMillis());
 
-                    Logger.global.logDebug("Scheduled update for region-file: " + regionPos + " (Map: " + map.getId() + ")");
+                    verboseLog.accept("Scheduled update for region-file: " + regionPos + " (Map: " + map.getId() + ")");
                 }
             }
         };
+
+        Long lastUpdateTime = lastUpdateTimes.getIfPresent(regionPos);
+        if (lastUpdateTime == null) lastUpdateTime = 0L;
+        long timeSinceLastUpdate = System.currentTimeMillis() - lastUpdateTime;
+        long delay = Math.max(regionUpdateCooldown.toMillis() - timeSinceLastUpdate, 5000);
         scheduledUpdates.put(regionPos, task);
-        delayTimer.schedule(task, 5000);
+        delayTimer.schedule(task, delay);
     }
 
     public synchronized void close() {

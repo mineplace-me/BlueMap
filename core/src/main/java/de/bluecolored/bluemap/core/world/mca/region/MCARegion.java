@@ -26,12 +26,9 @@ package de.bluecolored.bluemap.core.world.mca.region;
 
 import com.flowpowered.math.vector.Vector2i;
 import de.bluecolored.bluemap.core.storage.compression.Compression;
-import de.bluecolored.bluemap.core.world.Chunk;
 import de.bluecolored.bluemap.core.world.ChunkConsumer;
 import de.bluecolored.bluemap.core.world.Region;
 import de.bluecolored.bluemap.core.world.mca.ChunkLoader;
-import de.bluecolored.bluemap.core.world.mca.chunk.MCAChunkLoader;
-import de.bluecolored.bluemap.core.world.mca.chunk.MCAChunk;
 import lombok.Getter;
 
 import java.io.IOException;
@@ -100,9 +97,9 @@ public class MCARegion<T> implements Region<T> {
             channel.position(offset);
             readFully(channel, chunkDataBuffer, 0, size);
 
-            return loadChunk(chunkDataBuffer, size);
+            return loadChunk(chunkX, chunkZ, chunkDataBuffer, size);
         } catch (IOException | RuntimeException ex) {
-            throw new IOException("Exception trying to read chunk (%d,%d) from region '%s'".formatted(chunkX, chunkZ, regionFile), ex);
+            throw new IOException("Exception trying to read chunk (%d,%d) from region '%s': %s".formatted(chunkX, chunkZ, regionFile, ex), ex);
         }
     }
 
@@ -155,7 +152,7 @@ public class MCARegion<T> implements Region<T> {
                         readFully(channel, chunkDataBuffer, 0, size);
 
                         try {
-                            T chunk = loadChunk(chunkDataBuffer, size);
+                            T chunk = loadChunk(chunkX, chunkZ, chunkDataBuffer, size);
                             consumer.accept(chunkX, chunkZ, chunk);
                         } catch (IOException ex) {
                             consumer.fail(chunkX, chunkZ, ex);
@@ -167,7 +164,7 @@ public class MCARegion<T> implements Region<T> {
                 }
             }
         } catch (IOException | RuntimeException ex) {
-            throw new IOException("Exception trying to iterate chunks in region '%s'".formatted(regionFile), ex);
+            throw new IOException("Exception trying to iterate chunks in region '%s': %s".formatted(regionFile, ex), ex);
         }
     }
 
@@ -176,13 +173,25 @@ public class MCARegion<T> implements Region<T> {
         return chunkLoader.emptyChunk();
     }
 
-    private T loadChunk(byte[] data, int size) throws IOException {
+    private T loadChunk(int chunkX, int chunkZ, byte[] data, int size) throws IOException {
         int compressionTypeId = Byte.toUnsignedInt(data[4]);
+        int offset = 5;
+        size -= 5;
+
+        //oversized chunks
+        if (compressionTypeId > 127) {
+            compressionTypeId -= 128;
+            Path chunkFile = regionFile.getParent().resolve("c.%d.%d.mcc".formatted(chunkX, chunkZ));
+            data = Files.readAllBytes(chunkFile);
+            offset = 0;
+            size = data.length;
+        }
+
         Compression compression = CHUNK_COMPRESSION_MAP[compressionTypeId];
         if (compression == null)
             throw new IOException("Unknown chunk compression-id: " + compressionTypeId);
 
-        return chunkLoader.load(data, 5, size - 5, compression);
+        return chunkLoader.load(data, offset, size, compression);
     }
 
     public static String getRegionFileName(int regionX, int regionZ) {

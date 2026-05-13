@@ -2,7 +2,7 @@ import com.github.gradle.node.npm.task.NpmTask
 import java.io.IOException
 
 plugins {
-    bluemap.base
+    bluemap.java
     alias ( libs.plugins.node.gradle )
 }
 
@@ -14,23 +14,13 @@ dependencies {
 
     compileOnly ( libs.bluecommands.brigadier )
     compileOnly ( libs.brigadier )
-
-    compileOnly ( libs.jetbrains.annotations )
-    compileOnly ( libs.lombok )
-
-    annotationProcessor ( libs.lombok )
-
-    // tests
-    testImplementation ( libs.junit.core )
-    testRuntimeOnly ( libs.junit.engine )
-    testRuntimeOnly ( libs.lombok )
-    testAnnotationProcessor ( libs.lombok )
 }
 
 node {
     version = "20.14.0"
     download = true
     nodeProjectDir = file("webapp/")
+    npmInstallCommand = "ci"
 }
 
 tasks.register("buildWebapp", type = NpmTask::class) {

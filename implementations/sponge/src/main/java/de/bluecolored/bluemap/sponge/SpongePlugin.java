@@ -27,7 +27,6 @@ package de.bluecolored.bluemap.sponge;
 import com.flowpowered.math.vector.Vector2i;
 import com.flowpowered.math.vector.Vector3d;
 import com.flowpowered.math.vector.Vector3i;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.inject.Inject;
 import de.bluecolored.bluemap.common.plugin.Plugin;
@@ -35,8 +34,8 @@ import de.bluecolored.bluemap.common.serverinterface.Player;
 import de.bluecolored.bluemap.common.serverinterface.Server;
 import de.bluecolored.bluemap.common.serverinterface.ServerEventListener;
 import de.bluecolored.bluemap.common.serverinterface.ServerWorld;
-import de.bluecolored.bluemap.core.BlueMap;
 import de.bluecolored.bluemap.core.logger.Logger;
+import de.bluecolored.bluemap.core.util.Caches;
 import org.spongepowered.api.ResourceKey;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.command.Command;
@@ -55,6 +54,7 @@ import org.spongepowered.api.util.Tristate;
 import org.spongepowered.plugin.PluginContainer;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -96,8 +96,7 @@ public class SpongePlugin implements Server {
         this.pluginInstance = new Plugin("sponge", this);
         this.commands = new SpongeCommands(pluginInstance);
 
-        this.worlds = Caffeine.newBuilder()
-                .executor(BlueMap.THREAD_POOL)
+        this.worlds = Caches.with()
                 .weakKeys()
                 .maximumSize(1000)
                 .build(SpongeWorld::new);
@@ -194,13 +193,13 @@ public class SpongePlugin implements Server {
 
     @Override
     public void registerListener(ServerEventListener listener) {
-        Sponge.eventManager().registerListeners(this.pluginContainer, new EventForwarder(listener));
+        Sponge.eventManager().registerListeners(this.pluginContainer, new EventForwarder(listener), MethodHandles.lookup());
     }
 
     @Override
     public void unregisterAllListeners() {
         Sponge.eventManager().unregisterListeners(this.pluginContainer);
-        Sponge.eventManager().registerListeners(this.pluginContainer, this);
+        Sponge.eventManager().registerListeners(this.pluginContainer, this, MethodHandles.lookup());
     }
 
     @Override

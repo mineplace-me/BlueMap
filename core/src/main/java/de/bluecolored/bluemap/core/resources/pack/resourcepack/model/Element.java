@@ -100,17 +100,29 @@ public class Element {
 
     private Vector4f calculateDefaultUV(Direction face) {
         return switch (face) {
-            case DOWN, UP -> new Vector4f(
+            case UP -> new Vector4f(
                     from.getX(), from.getZ(),
                     to.getX(), to.getZ()
             );
-            case NORTH, SOUTH -> new Vector4f(
-                    from.getX(), from.getY(),
-                    to.getX(), to.getY()
+            case DOWN -> new Vector4f(
+                    from.getX(), 16 - to.getZ(),
+                    to.getX(), 16 - from.getZ()
             );
-            case WEST, EAST -> new Vector4f(
-                    from.getZ(), from.getY(),
-                    to.getZ(), to.getY()
+            case NORTH -> new Vector4f(
+                    16 - to.getX(), 16 - to.getY(),
+                    16 - from.getX(), 16 - from.getY()
+            );
+            case SOUTH -> new Vector4f(
+                    from.getX(), 16 - to.getY(),
+                    to.getX(), 16 - from.getY()
+            );
+            case EAST -> new Vector4f(
+                    16 - to.getZ(), 16 - to.getY(),
+                    16 - from.getZ(), 16 - from.getY()
+            );
+            case WEST -> new Vector4f(
+                    from.getZ(), 16 - to.getY(),
+                    to.getZ(), 16 - from.getY()
             );
         };
     }

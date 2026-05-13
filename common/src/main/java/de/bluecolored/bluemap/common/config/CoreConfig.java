@@ -24,32 +24,39 @@
  */
 package de.bluecolored.bluemap.common.config;
 
+import lombok.Getter;
 import org.spongepowered.configurate.objectmapping.ConfigSerializable;
 
 import java.nio.file.Path;
+import java.time.Duration;
 
 @SuppressWarnings({"FieldMayBeFinal", "FieldCanBeLocal"})
 @ConfigSerializable
+@Getter
 public class CoreConfig {
 
     private boolean acceptDownload = false;
 
     private int renderThreadCount = 1;
 
+    private int renderThreadPriority = Thread.NORM_PRIORITY;
+
+    private int updateCooldown = 60;
+    private int fullUpdateInterval = 1440;
+
     private boolean metrics = true;
 
     private Path data = Path.of("bluemap");
-
     private boolean scanForModResources = true;
 
     private LogConfig log = new LogConfig();
 
-    public boolean isAcceptDownload() {
-        return acceptDownload;
+    public Duration getUpdateCooldown() {
+        return Duration.ofSeconds(updateCooldown);
     }
 
-    public int getRenderThreadCount() {
-        return renderThreadCount;
+    public Duration getFullUpdateInterval() {
+        return Duration.ofMinutes(fullUpdateInterval);
     }
 
     public int resolveRenderThreadCount() {
@@ -57,35 +64,12 @@ public class CoreConfig {
         return Math.max(Runtime.getRuntime().availableProcessors() + renderThreadCount, 1);
     }
 
-    public boolean isMetrics() {
-        return metrics;
-    }
-
-    public Path getData() {
-        return data;
-    }
-
-    public boolean isScanForModResources() {
-        return scanForModResources;
-    }
-
-    public LogConfig getLog() {
-        return log;
-    }
-
     @ConfigSerializable
+    @Getter
     public static class LogConfig {
 
         private String file = null;
         private boolean append = false;
-
-        public String getFile() {
-            return file;
-        }
-
-        public boolean isAppend() {
-            return append;
-        }
 
     }
 

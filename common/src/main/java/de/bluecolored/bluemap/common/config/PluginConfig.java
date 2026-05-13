@@ -24,13 +24,16 @@
  */
 package de.bluecolored.bluemap.common.config;
 
+import lombok.Getter;
 import org.spongepowered.configurate.objectmapping.ConfigSerializable;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
 @SuppressWarnings({"FieldMayBeFinal", "FieldCanBeLocal"})
 @ConfigSerializable
+@Getter
 public class PluginConfig {
 
     private boolean livePlayerMarkers = true;
@@ -49,59 +52,5 @@ public class PluginConfig {
     private boolean skinDownload = true;
 
     private int playerRenderLimit = -1;
-
-    private int fullUpdateInterval = 1440;
-
-    public boolean isLivePlayerMarkers() {
-        return livePlayerMarkers;
-    }
-
-    public List<String> getHiddenGameModes() {
-        return hiddenGameModes;
-    }
-
-    public boolean isHideVanished() {
-        return hideVanished;
-    }
-
-    public boolean isHideInvisible() {
-        return hideInvisible;
-    }
-
-    public boolean isHideSneaking() {
-        return hideSneaking;
-    }
-
-    public boolean isHideDifferentWorld() {
-        return hideDifferentWorld;
-    }
-
-    public int getHideBelowSkyLight() {
-        return hideBelowSkyLight;
-    }
-
-    public int getHideBelowBlockLight() {
-        return hideBelowBlockLight;
-    }
-
-    public int getWriteMarkersInterval() {
-        return writeMarkersInterval;
-    }
-
-    public int getWritePlayersInterval() {
-        return writePlayersInterval;
-    }
-
-    public boolean isSkinDownload() {
-        return skinDownload;
-    }
-
-    public int getPlayerRenderLimit() {
-        return playerRenderLimit;
-    }
-
-    public int getFullUpdateInterval() {
-        return fullUpdateInterval;
-    }
 
 }

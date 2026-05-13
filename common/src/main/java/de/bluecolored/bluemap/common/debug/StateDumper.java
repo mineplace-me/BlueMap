@@ -24,9 +24,13 @@
  */
 package de.bluecolored.bluemap.common.debug;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.google.gson.stream.JsonWriter;
 import de.bluecolored.bluemap.core.BlueMap;
 import de.bluecolored.bluemap.core.util.Key;
+import de.bluecolored.bluemap.core.util.Registry;
+import lombok.SneakyThrows;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -61,19 +65,26 @@ public class StateDumper {
 
         Set<Object> alreadyDumped = Collections.newSetFromMap(new IdentityHashMap<>());
 
-        writer.name("threads").beginArray();
-        for (Thread thread : Thread.getAllStackTraces().keySet()) {
-            dumpInstance(thread, writer, alreadyDumped);
+        writer.name("registries").beginArray();
+        for (Object instance : Registry.REGISTRIES) {
+            dumpInstance(instance, writer, alreadyDumped);
         }
         writer.endArray();
 
-        writer.name("dump").beginObject();
+        writer.name("dump").beginArray();
         for (Object instance : instances) {
-            Class<?> type = instance.getClass();
-            writer.name(type.getName());
             dumpInstance(instance, writer, alreadyDumped);
         }
-        writer.endObject();
+        writer.endArray();
+
+        writer.name("threads").beginArray();
+        Thread.getAllStackTraces().keySet().stream()
+                .sorted(Comparator.comparing(Thread::getName))
+                .forEach(thread -> {
+                        alreadyDumped.remove(thread);
+                        dumpInstance(thread, writer, alreadyDumped);
+                });
+        writer.endArray();
 
         writer.endObject();
 
@@ -81,7 +92,8 @@ public class StateDumper {
         writer.close();
     }
 
-    private void dumpInstance(Object instance, JsonWriter writer, Set<Object> alreadyDumped) throws IOException {
+    @SneakyThrows(IOException.class)
+    private void dumpInstance(Object instance, JsonWriter writer, Set<Object> alreadyDumped) {
 
         if (instance == null) {
             writer.nullValue();
@@ -117,7 +129,57 @@ public class StateDumper {
             String identityString = toIdentityString(instance);
             writer.name("#identity").value(identityString);
 
+            if (instance instanceof Cache<?,?> cache) {
+                writer.name("stats");
+                dumpInstance(cache.stats(), writer, alreadyDumped);
+
+                writer.name("estimated-size").value(cache.estimatedSize());
+
+                writer.name("entries").beginArray();
+                int count = 0;
+                for (Map.Entry<?, ?> entry : cache.asMap().entrySet()) {
+                    if (++count > 10) {
+                        writer.value("<<more elements>>");
+                        break;
+                    }
+
+                    writer.beginObject();
+                    try {
+
+                        writer.name("key");
+                        dumpInstance(entry.getKey(), writer, alreadyDumped);
+
+                        writer.name("value");
+                        dumpInstance(entry.getValue(), writer, alreadyDumped);
+
+                    } finally {
+                        writer.endObject();
+                    }
+
+                }
+                writer.endArray();
+                return;
+            }
+
+            if (instance instanceof CacheStats cacheStats) {
+                writer.name("request-count").value(cacheStats.requestCount());
+                writer.name("hit-count").value(cacheStats.hitCount());
+                writer.name("hit-rate").value(cacheStats.hitRate());
+                writer.name("miss-count").value(cacheStats.missCount());
+                writer.name("miss-rate").value(cacheStats.missRate());
+                writer.name("load-count").value(cacheStats.loadCount());
+                writer.name("load-success-count").value(cacheStats.loadSuccessCount());
+                writer.name("load-failure-count").value(cacheStats.loadFailureCount());
+                writer.name("load-failure-rate").value(cacheStats.loadFailureRate());
+                writer.name("total-load-time").value(cacheStats.totalLoadTime());
+                writer.name("average-load-penalty").value(cacheStats.averageLoadPenalty());
+                writer.name("eviction-count").value(cacheStats.evictionCount());
+                writer.name("eviction-weight").value(cacheStats.evictionWeight());
+                return;
+            }
+
             if (instance instanceof Map<?, ?> map) {
+                writer.name("size").value(map.size());
                 writer.name("entries").beginArray();
 
                 int count = 0;
@@ -128,14 +190,17 @@ public class StateDumper {
                     }
 
                     writer.beginObject();
+                    try {
 
-                    writer.name("key");
-                    dumpInstance(entry.getKey(), writer, alreadyDumped);
+                        writer.name("key");
+                        dumpInstance(entry.getKey(), writer, alreadyDumped);
 
-                    writer.name("value");
-                    dumpInstance(entry.getValue(), writer, alreadyDumped);
+                        writer.name("value");
+                        dumpInstance(entry.getValue(), writer, alreadyDumped);
 
-                    writer.endObject();
+                    } finally {
+                        writer.endObject();
+                    }
                 }
 
                 writer.endArray();
@@ -143,6 +208,7 @@ public class StateDumper {
             }
 
             if (instance instanceof Collection<?> collection) {
+                writer.name("size").value(collection.size());
                 writer.name("entries").beginArray();
 
                 int count = 0;
@@ -160,6 +226,7 @@ public class StateDumper {
             }
 
             if (instance instanceof Object[] array) {
+                writer.name("length").value(array.length);
                 writer.name("entries").beginArray();
 
                 int count = 0;
@@ -185,7 +252,7 @@ public class StateDumper {
                 writer.name("state").value(thread.getState().toString());
                 writer.name("priority").value(thread.getPriority());
                 writer.name("alive").value(thread.isAlive());
-                writer.name("id").value(thread.getId());
+                writer.name("id").value(thread.threadId());
                 writer.name("deamon").value(thread.isDaemon());
                 writer.name("interrupted").value(thread.isInterrupted());
 
@@ -197,6 +264,10 @@ public class StateDumper {
                     }
                     writer.endArray();
                 } catch (SecurityException ignore) {}
+
+                writer.name("instance").beginObject();
+                dumpAnnotatedInstance(instance.getClass(), instance, writer, alreadyDumped);
+                writer.endObject();
 
                 return;
             }
